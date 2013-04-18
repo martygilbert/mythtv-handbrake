@@ -89,13 +89,13 @@ function ffmpeg_cut_src {
 
     for (( i=0 ; i<cnt ; i++ ))
     do
-        if [ ${array[$i]} == 0 ] || [ ${array[$i]} == 5 ]; then 
+        if [ ${array[$i]} == 0 ] || [ ${array[$i]} == 4 ]; then 
             (( i++ ))
             SS=$(echo "${array[$i]} / $FPS * 1000" | bc -l)
             if [ "$SS" -ne 0 ]; then
                 SS=${SS:0:(${#SS}-17)}
             fi
-        elif [ ${array[$i]} == 1 ] || [ ${array[$i]} == 4 ]; then 
+        elif [ ${array[$i]} == 1 ] || [ ${array[$i]} == 5 ]; then 
             (( i++ ))
             T=$(echo "(${array[$i]} / $FPS * 1000) - $SS" | bc -l)
             if [ "$T" -ne 0 ]; then
@@ -117,7 +117,7 @@ function ffmpeg_cut_src {
 #### HandBrakeCLI files ####
 function handbrake_encode {
     for file in $(find $tmpdir -name tmp\*.mpg); do
-        echo "File Found - $file" >> "$logfile"
+        echo "File Found for Encoding - $file" >> "$logfile"
         if [ "$1" -eq 1 ]; then
             echo "only one file found";
             output="$outdir/$NAME.mkv"
@@ -136,8 +136,9 @@ function merge_files {
     PLUS=""
     APPEND="--append-to "
     i=1
+    echo "find $tmpdir -name tmp\*.mpg.mkv" >> "$logfile"
     for file in $(find $tmpdir -name tmp\*.mpg.mkv); do
-        echo "File Found - $file"
+        echo "File Found for Merging - $file"
         MERGE=$(echo "$MERGE $PLUS$file")
         if [ "$PLUS" == "+" ]
         then
@@ -148,7 +149,8 @@ function merge_files {
     done
 
     APPEND=${APPEND:0:(${#APPEND}-1)}
-    echo "$MERGE $APPEND" >> "$logfile"
+
+    echo "$MKVMERGE" -o $outdir/$NAME.mkv "$MERGE" "$APPEND" >> "$logfile"
     "$MKVMERGE" -o $outdir/$NAME.mkv $MERGE $APPEND
     echo "mkvmerge exit code:$? " >> "$logfile"
 }
