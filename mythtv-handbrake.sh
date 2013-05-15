@@ -13,18 +13,24 @@ logdir="/var/log/mythtv"
 mythrecordingsdir="/video/storage"
 tmpdir="/video/tmp" 
 outdir="/video/videos"
-outdir="/tmp"
+#outdir="/tmp"
 scriptstarttime=$(date +%F-%H%M%S)
 logfile="$logdir/$scriptstarttime-COMCUT.log"
 
 #Database Info
 USER="mythtv";
-PASS="mythtv";
+PASS="mypass";
 DB="mythconverg";
 
 HANDBRAKE="/bin/HandBrakeCLI";
 FFMPEG="/bin/ffmpeg";
 MKVMERGE="/bin/mkvmerge";
+
+
+######## NICE THE PROCESS ##################3
+MYPID=$$
+renice 19 $MYPID
+ionice -c 3 -p $MYPID
 
 ######## CLEAN-UP FROM PREVIOUS JOB ###############
 rm -f $tmpdir/tmp*.mpg*
@@ -89,13 +95,13 @@ function ffmpeg_cut_src {
 
     for (( i=0 ; i<cnt ; i++ ))
     do
-        if [ ${array[$i]} == 0 ] || [ ${array[$i]} == 4 ]; then 
+        if [ ${array[$i]} == 0 ] || [ ${array[$i]} == 5 ]; then 
             (( i++ ))
             SS=$(echo "${array[$i]} / $FPS * 1000" | bc -l)
             if [ "$SS" -ne 0 ]; then
                 SS=${SS:0:(${#SS}-17)}
             fi
-        elif [ ${array[$i]} == 1 ] || [ ${array[$i]} == 5 ]; then 
+        elif [ ${array[$i]} == 1 ] || [ ${array[$i]} == 4 ]; then 
             (( i++ ))
             T=$(echo "(${array[$i]} / $FPS * 1000) - $SS" | bc -l)
             if [ "$T" -ne 0 ]; then
@@ -107,8 +113,9 @@ function ffmpeg_cut_src {
                 SKIP=$(echo "$SS-30" | bc -l)
                 SS=30
             fi
+            prettyI=`printf "%03d" $i`;
             "$FFMPEG" -ss $SKIP -i $mythrecordingsdir/$1 -ss $SS \
-                -t $T -vcodec copy -acodec copy $tmpdir/tmp$i.mpg
+                -t $T -vcodec copy -acodec copy $tmpdir/tmp$prettyI.mpg
         fi
     done
     return $cnt;
@@ -116,10 +123,12 @@ function ffmpeg_cut_src {
 
 #### HandBrakeCLI files ####
 function handbrake_encode {
-    for file in $(find $tmpdir -name tmp\*.mpg); do
+    #for file in $(find $tmpdir -name tmp\*.mpg | sort); do
+    #echo "for file in $(ls -rt $tmpdir/tmp*.mpg); do"
+    for file in $(ls -1 $tmpdir/tmp*.mpg); do
         echo "File Found for Encoding - $file" >> "$logfile"
         if [ "$1" -eq 1 ]; then
-            echo "only one file found";
+            echo "only one file found" >> "$logfile";
             output="$outdir/$NAME.mkv"
         else 
             output="$file.mkv"
@@ -134,24 +143,16 @@ function handbrake_encode {
 function merge_files {
     MERGE=" "
     PLUS=""
-    APPEND="--append-to "
-    i=1
-    echo "find $tmpdir -name tmp\*.mpg.mkv" >> "$logfile"
-    for file in $(find $tmpdir -name tmp\*.mpg.mkv); do
+    #for file in $(find $tmpdir -name tmp\*.mpg.mkv | sort); do
+    #echo "for file in $(ls -rt $tmpdir/tmp*.mpg.mkv); do"
+    for file in $(ls -1 $tmpdir/tmp*.mpg.mkv); do
         echo "File Found for Merging - $file"
         MERGE=$(echo "$MERGE $PLUS$file")
-        if [ "$PLUS" == "+" ]
-        then
-            APPEND=$(echo "$APPEND$i:0:$[i-1]:0,$i:1:$[i-1]:1,")
-            (( i++ ))
-        fi
         PLUS="+"
     done
 
-    APPEND=${APPEND:0:(${#APPEND}-1)}
-
-    echo "$MKVMERGE" -o $outdir/$NAME.mkv "$MERGE" "$APPEND" >> "$logfile"
-    "$MKVMERGE" -o $outdir/$NAME.mkv $MERGE $APPEND
+    echo "$MKVMERGE" -o $outdir/$NAME.mkv "$MERGE" >> "$logfile"
+    "$MKVMERGE" -o $outdir/$NAME.mkv $MERGE 
     echo "mkvmerge exit code:$? " >> "$logfile"
 }
 
